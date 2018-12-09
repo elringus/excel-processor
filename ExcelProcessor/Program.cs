@@ -1,11 +1,15 @@
 ﻿using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 
 public class Program
 {
+    private static List<string> warnings = new List<string>();
+    private static string processedFilePath = string.Empty;
+
     private static void Main (string[] args)
     {
         var exePath = Assembly.GetEntryAssembly().Location;
@@ -24,10 +28,21 @@ public class Program
         var summaryFilePath = Path.Combine(summaryDirPath, "Summary.xlsx");
         using (var stream = new FileStream(summaryFilePath, FileMode.Create, FileAccess.ReadWrite))
             summaryBook.Write(stream);
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        foreach (var warning in warnings)
+            Console.WriteLine($"WARNING: {warning}");
+        Console.ForegroundColor = ConsoleColor.White;
+
+        Console.WriteLine($"Summary created at `{summaryFilePath}`.");
+        Console.WriteLine("Press any key to exit...");
+        Console.ReadKey();
     }
 
     private static void ProcessXlsFile (FileInfo sourceFile, XSSFWorkbook summaryBook)
     {
+        processedFilePath = sourceFile.FullName;
+
         var stream = new FileStream(sourceFile.FullName, FileMode.Open);
         var sourceBook = new XSSFWorkbook(stream);
 
@@ -39,9 +54,12 @@ public class Program
             var summarySheet = summaryBook.GetSheetAt(sheetIndex);
             var sourceSheet = sourceBook.GetSheetAt(sheetIndex);
 
+            Console.Clear();
+            Console.Write($"\rProcessing `{sourceFile.FullName}`...");
             ProcessSheet(sourceSheet, summarySheet);
         }
 
+        Console.Clear();
         stream.Dispose();
     }
 
@@ -74,7 +92,7 @@ public class Program
         for (int columnIndex = 0; columnIndex < summaryRow.LastCellNum; columnIndex++)
         {
             try { summaryRow.Sheet.AutoSizeColumn(columnIndex); }
-            catch { }
+            catch { /*warnings.Add($"Failed to auto-size column with index `{columnIndex}` of `{processedFilePath}`.");*/ }
         }
     }
 
@@ -86,17 +104,72 @@ public class Program
             summaryCell.CellStyle.CloneStyleFrom(sourceCell.CellStyle);
         }
 
-        if (sourceCell.CellType != CellType.Numeric)
+        if (sourceCell.CellType == CellType.Blank) return;
+
+        if (sourceCell.CellType == CellType.Numeric)
         {
-            if (summaryCell.CellType == CellType.Numeric) return;
-            summaryCell.SetCellValue(sourceCell.StringCellValue);
-            return;
+            var sourceValue = sourceCell.NumericCellValue;
+            switch (summaryCell.CellType)
+            {
+                case CellType.Numeric:
+                    summaryCell.SetCellValue(summaryCell.NumericCellValue + sourceValue);
+                    return;
+                case CellType.Blank:
+                    summaryCell.SetCellValue(sourceValue);
+                    return;
+                case CellType.String:
+                    if (string.IsNullOrWhiteSpace(summaryCell.StringCellValue))
+                        summaryCell.SetCellValue("0");
+                    var parsed = double.TryParse(summaryCell.StringCellValue, out var summaryValue);
+                    if (parsed) summaryCell.SetCellValue(summaryValue + sourceValue);
+                    else goto default;
+                    return;
+                default:
+                    AddWarning(1, summaryCell);
+                    return;
+            }
         }
 
-        if (summaryCell.CellType != CellType.Numeric)
-            summaryCell.SetCellType(CellType.Numeric);
+        if (sourceCell.CellType == CellType.String)
+        {
+            switch (summaryCell.CellType)
+            {
+                case CellType.Numeric:
+                    if (string.IsNullOrWhiteSpace(sourceCell.StringCellValue))
+                        sourceCell.SetCellValue("0");
+                    var parsed = double.TryParse(sourceCell.StringCellValue, out var sourceValue);
+                    if (parsed) summaryCell.SetCellValue(summaryCell.NumericCellValue + sourceValue);
+                    else goto default;
+                    return;
+                case CellType.Blank:
+                case CellType.String:
+                    summaryCell.SetCellValue(sourceCell.StringCellValue);
+                    return;
+                default:
+                    AddWarning(2, summaryCell);
+                    return;
+            }
+        }
+    }
 
-        var summaryValue = summaryCell.NumericCellValue + Math.Abs(sourceCell.NumericCellValue);
-        summaryCell.SetCellValue(summaryValue);
+    private static void AddWarning (int code, ICell cell)
+    {
+        warnings.Add($"PCE#{code} in book `{processedFilePath}` sheet `{cell.Sheet.SheetName}` row `{cell.RowIndex + 1}` column `{ColumnNumberToName(cell.ColumnIndex + 1)}`.");
+    }
+
+    private static string ColumnNumberToName (int columnNumber)
+    {
+        var dividend = columnNumber;
+        var columnName = string.Empty;
+        int modulo;
+
+        while (dividend > 0)
+        {
+            modulo = (dividend - 1) % 26;
+            columnName = Convert.ToChar(65 + modulo).ToString() + columnName;
+            dividend = (dividend - modulo) / 26;
+        }
+
+        return columnName;
     }
 }
