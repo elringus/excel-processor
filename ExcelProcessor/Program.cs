@@ -19,6 +19,11 @@ public class Program
         var sourceFiles = dirInfo.GetFiles("*.xlsx", SearchOption.TopDirectoryOnly);
         if (sourceFiles.Length == 0) return;
 
+        var wrongFiles = dirInfo.GetFiles("*.xls", SearchOption.TopDirectoryOnly);
+        foreach (var wrongFile in wrongFiles)
+            if (wrongFile.Name.EndsWith(".xls", StringComparison.InvariantCultureIgnoreCase))
+                warnings.Add($"File `{wrongFile.FullName}` has a legacy Excel format and won't be processed.");
+
         var summaryBook = new XSSFWorkbook();
         foreach (var sourceFile in sourceFiles)
             ProcessXlsFile(sourceFile, summaryBook);
@@ -125,7 +130,7 @@ public class Program
                     else goto default;
                     return;
                 default:
-                    AddWarning(1, summaryCell);
+                    AddPCEWarning(1, summaryCell);
                     return;
             }
         }
@@ -146,13 +151,13 @@ public class Program
                     summaryCell.SetCellValue(sourceCell.StringCellValue);
                     return;
                 default:
-                    AddWarning(2, summaryCell);
+                    AddPCEWarning(2, summaryCell);
                     return;
             }
         }
     }
 
-    private static void AddWarning (int code, ICell cell)
+    private static void AddPCEWarning (int code, ICell cell)
     {
         warnings.Add($"PCE#{code} in book `{processedFilePath}` sheet `{cell.Sheet.SheetName}` row `{cell.RowIndex + 1}` column `{ColumnNumberToName(cell.ColumnIndex + 1)}`.");
     }
