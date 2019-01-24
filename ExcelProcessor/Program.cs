@@ -26,7 +26,10 @@ public class Program
 
         var summaryBook = new XSSFWorkbook();
         foreach (var sourceFile in sourceFiles)
-            ProcessXlsFile(sourceFile, summaryBook);
+        {
+            try { ProcessXlsFile(sourceFile, summaryBook); }
+            catch (Exception e) { warnings.Add($"Failed to process file {sourceFile.Name}: {e.Message}"); }
+        }
 
         var summaryDirPath = Path.Combine(dirPath, "Summary");
         Directory.CreateDirectory(summaryDirPath);
