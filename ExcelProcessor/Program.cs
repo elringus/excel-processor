@@ -12,7 +12,7 @@ public class Program
 
     private static void Main (string[] args)
     {
-        var exePath = Assembly.GetEntryAssembly().Location;
+        var exePath = Assembly.GetEntryAssembly()?.Location;
         var dirPath = Path.GetDirectoryName(exePath);
         var dirInfo = new DirectoryInfo(dirPath);
 
@@ -133,7 +133,7 @@ public class Program
                     else goto default;
                     return;
                 default:
-                    AddPCEWarning(1, summaryCell);
+                    AddPCEWarning(1, sourceCell);
                     return;
             }
         }
@@ -154,7 +154,7 @@ public class Program
                     summaryCell.SetCellValue(sourceCell.StringCellValue);
                     return;
                 default:
-                    AddPCEWarning(2, summaryCell);
+                    AddPCEWarning(2, sourceCell);
                     return;
             }
         }
@@ -174,7 +174,7 @@ public class Program
         while (dividend > 0)
         {
             modulo = (dividend - 1) % 26;
-            columnName = Convert.ToChar(65 + modulo).ToString() + columnName;
+            columnName = Convert.ToChar(65 + modulo) + columnName;
             dividend = (dividend - modulo) / 26;
         }
 
