@@ -1,0 +1,1 @@
+Creates a pivot spreadsheet from all the `.xlsx` files found at the same directory as the executable. Will summarize all the numeric cells and attempt to parse string cells to numerics when possible. Other cells will be copied. All the libraries are compiled into a single `.exe` on build.
